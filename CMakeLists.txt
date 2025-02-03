@@ -63,6 +63,14 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel." FORCE)
 endif()
 
+
+
+
+
+
+
+
+
 if(GPU_RUNTIME STREQUAL "CUDA")
     find_package(CUDAToolkit)
     if (NOT CUDAToolkit_FOUND)
@@ -130,7 +138,7 @@ elseif(GPU_RUNTIME STREQUAL "HIP")
     set(CMAKE_MODULE_PATH "${HIP_PATH}/cmake" ${CMAKE_MODULE_PATH})
     find_package(HIP REQUIRED)
 
-    file(GLOB_RECURSE GSPLAT_GPU_SRC LIST_DIRECTORIES False rasterizer/gsplat/*.cu)
+    file(GLOB_RECURSE GSPLAT_GPU_SRC LIST_DIRECTORIES False liba/rasterizer/gsplat/*.cu)
     set_source_files_properties(${GSPLAT_GPU_SRC} PROPERTIES LANGUAGE HIP)
 
     if(WIN32)
@@ -173,9 +181,11 @@ if (NOT WIN32 AND NOT APPLE)
 endif()
 set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui opencv_calib3d)
 
+
+
 set(GSPLAT_LIBS gsplat_cpu)
 if((GPU_RUNTIME STREQUAL "CUDA") OR (GPU_RUNTIME STREQUAL "HIP"))
-    add_library(gsplat rasterizer/gsplat/forward.cu rasterizer/gsplat/backward.cu rasterizer/gsplat/bindings.cu rasterizer/gsplat/helpers.cuh)
+    add_library(gsplat libs/rasterizer/gsplat/forward.cu libs/rasterizer/gsplat/backward.cu libs/rasterizer/gsplat/bindings.cu libs/rasterizer/gsplat/helpers.cuh)
     list(APPEND GSPLAT_LIBS gsplat)
     if(GPU_RUNTIME STREQUAL "CUDA")
         set(GPU_LIBRARIES "cuda")
@@ -191,7 +201,7 @@ if((GPU_RUNTIME STREQUAL "CUDA") OR (GPU_RUNTIME STREQUAL "HIP"))
     target_link_libraries(gsplat PUBLIC glm::glm-header-only)
     set_target_properties(gsplat PROPERTIES LINKER_LANGUAGE CXX)
 elseif(GPU_RUNTIME STREQUAL "MPS")    
-    add_library(gsplat rasterizer/gsplat-metal/gsplat_metal.mm)
+    add_library(gsplat libs/rasterizer/gsplat-metal/gsplat_metal.mm)
     list(APPEND GSPLAT_LIBS gsplat)
     target_link_libraries(gsplat PRIVATE 
         ${FOUNDATION_LIBRARY}
@@ -200,14 +210,14 @@ elseif(GPU_RUNTIME STREQUAL "MPS")
     )
     target_include_directories(gsplat PRIVATE ${TORCH_INCLUDE_DIRS})
     # copy shader files to bin directory
-    configure_file(rasterizer/gsplat-metal/gsplat_metal.metal ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gsplat_metal.metal COPYONLY)
+    configure_file(libs/rasterizer/gsplat-metal/gsplat_metal.metal ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gsplat_metal.metal COPYONLY)
     add_custom_command(
         OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/default.metallib
         COMMAND xcrun -sdk macosx metal    ${XC_FLAGS} -c ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gsplat_metal.metal -o ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gsplat_metal.air
         COMMAND xcrun -sdk macosx metallib                ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gsplat_metal.air   -o ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/default.metallib
         COMMAND rm -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gsplat_metal.air
         COMMAND rm -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gsplat_metal.metal
-        DEPENDS rasterizer/gsplat-metal/gsplat_metal.metal
+        DEPENDS libs/rasterizer/gsplat-metal/gsplat_metal.metal
         COMMENT "Compiling Metal kernels"
     )
 
@@ -217,56 +227,69 @@ elseif(GPU_RUNTIME STREQUAL "MPS")
     )
 endif()
 
-add_library(gsplat_cpu rasterizer/gsplat-cpu/gsplat_cpu.cpp)
+add_library(gsplat_cpu libs/rasterizer/gsplat-cpu/gsplat_cpu.cpp)
 target_include_directories(gsplat_cpu PRIVATE ${TORCH_INCLUDE_DIRS})
 
-set(OPENSPLAT_SRC_FILES opensplat.cpp point_io.cpp nerfstudio.cpp model.cpp
-kdtree_tensor.cpp spherical_harmonics.cpp cv_utils.cpp utils.cpp project_gaussians.cpp
-rasterize_gaussians.cpp ssim.cpp optim_scheduler.cpp colmap.cpp opensfm.cpp input_data.cpp
-tensor_math.cpp)
+
+
+
+
+
+
+set(OPENSPLAT_LIB_SRC_FILES libs/opensplat/point_io.cpp libs/opensplat/nerfstudio.cpp libs/opensplat/model.cpp
+libs/opensplat/kdtree_tensor.cpp libs/opensplat/spherical_harmonics.cpp libs/opensplat/cv_utils.cpp libs/opensplat/utils.cpp libs/opensplat/project_gaussians.cpp
+libs/opensplat/rasterize_gaussians.cpp libs/opensplat/ssim.cpp libs/opensplat/optim_scheduler.cpp libs/opensplat/colmap.cpp libs/opensplat/opensfm.cpp libs/opensplat/input_data.cpp
+libs/opensplat/tensor_math.cpp)
 
 if (OPENSPLAT_BUILD_VISUALIZER)
     if (Pangolin_FOUND)
         message(STATUS "Found Pangolin. Building visualizer (beta)")
-        list(APPEND OPENSPLAT_SRC_FILES visualizer.cpp)
+        list(APPEND OPENSPLAT_LIB_SRC_FILES libs/opensplat/visualizer.cpp)
         add_definitions(-DUSE_VISUALIZATION)
     else()
         message(FATAL "Pangolin not found. Cannot build visualizer (beta)")
     endif()
 endif()
 
-add_executable(opensplat ${OPENSPLAT_SRC_FILES})
-install(TARGETS opensplat DESTINATION bin)
-set_property(TARGET opensplat PROPERTY CXX_STANDARD 17)
-target_include_directories(opensplat PRIVATE
-    ${PROJECT_SOURCE_DIR}/rasterizer
+add_library(opensplat ${OPENSPLAT_LIB_SRC_FILES} )
+target_include_directories( opensplat PRIVATE libs/opensplat libs/rasterizer ${TORCH_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}
+)
+
+
+add_executable(opensplat_bin apps/opensplat.cpp)
+set_property(TARGET opensplat_bin PROPERTY OUTPUT_NAME opensplat)
+install(TARGETS opensplat_bin DESTINATION bin)
+set_property(TARGET opensplat_bin PROPERTY CXX_STANDARD 17)
+target_include_directories(opensplat_bin PRIVATE
+    ${PROJECT_SOURCE_DIR}/libs/rasterizer
+    ${PROJECT_SOURCE_DIR}/libs/opensplat
     ${GPU_INCLUDE_DIRS}
 )
-target_link_libraries(opensplat PUBLIC ${STDPPFS_LIBRARY} ${GPU_LIBRARIES} ${GSPLAT_LIBS} ${TORCH_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(opensplat_bin PUBLIC opensplat ${STDPPFS_LIBRARY} ${GPU_LIBRARIES} ${GSPLAT_LIBS} ${TORCH_LIBRARIES} ${OpenCV_LIBS})
 if (Pangolin_FOUND)
-    target_link_libraries(opensplat PUBLIC ${Pangolin_LIBRARIES})
+    target_link_libraries(opensplat_bin PUBLIC ${Pangolin_LIBRARIES})
 endif()
-target_link_libraries(opensplat PRIVATE
+target_link_libraries(opensplat_bin PRIVATE
     nlohmann_json::nlohmann_json
     cxxopts::cxxopts
     nanoflann::nanoflann
 )
 if (NOT WIN32)
-    target_link_libraries(opensplat PUBLIC pthread)
+    target_link_libraries(opensplat_bin PUBLIC pthread)
 endif()
 if(GPU_RUNTIME STREQUAL "HIP")
-    target_compile_definitions(opensplat PRIVATE USE_HIP __HIP_PLATFORM_AMD__)
+    target_compile_definitions(opensplat_bin PRIVATE USE_HIP __HIP_PLATFORM_AMD__)
 elseif(GPU_RUNTIME STREQUAL "CUDA")
-    target_compile_definitions(opensplat PRIVATE USE_CUDA)
+    target_compile_definitions(opensplat_bin PRIVATE USE_CUDA)
 elseif(GPU_RUNTIME STREQUAL "MPS")
-    target_compile_definitions(opensplat PRIVATE USE_MPS)
+    target_compile_definitions(opensplat_bin PRIVATE USE_MPS)
 endif()
 
 if(OPENSPLAT_BUILD_SIMPLE_TRAINER)
-    add_executable(simple_trainer simple_trainer.cpp project_gaussians.cpp rasterize_gaussians.cpp cv_utils.cpp)
+    add_executable(simple_trainer apps/simple_trainer.cpp libs/opensplat/project_gaussians.cpp libs/opensplat/rasterize_gaussians.cpp libs/opensplat/cv_utils.cpp)
     install(TARGETS simple_trainer DESTINATION bin)
     target_include_directories(simple_trainer PRIVATE
-        ${PROJECT_SOURCE_DIR}/rasterizer
+        ${PROJECT_SOURCE_DIR}/libs/rasterizer
         ${GPU_INCLUDE_DIRS}
     )
     target_link_libraries(simple_trainer PUBLIC ${GPU_LIBRARIES} ${GSPLAT_LIBS} ${TORCH_LIBRARIES} ${OpenCV_LIBS})
