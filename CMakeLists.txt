@@ -189,6 +189,7 @@ if((GPU_RUNTIME STREQUAL "CUDA") OR (GPU_RUNTIME STREQUAL "HIP"))
     list(APPEND GSPLAT_LIBS gsplat)
     if(GPU_RUNTIME STREQUAL "CUDA")
         set(GPU_LIBRARIES "cuda")
+        set(GPU_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
         target_link_libraries(gsplat PUBLIC cuda)
     else(GPU_RUNTIME STREQUAL "HIP")
         set(GPU_INCLUDE_DIRS "${ROCM_ROOT}/include")
@@ -235,25 +236,33 @@ target_include_directories(gsplat_cpu PRIVATE ${TORCH_INCLUDE_DIRS})
 
 
 
-
-set(OPENSPLAT_LIB_SRC_FILES libs/opensplat/point_io.cpp libs/opensplat/nerfstudio.cpp libs/opensplat/model.cpp
-libs/opensplat/kdtree_tensor.cpp libs/opensplat/spherical_harmonics.cpp libs/opensplat/cv_utils.cpp libs/opensplat/utils.cpp libs/opensplat/project_gaussians.cpp
-libs/opensplat/rasterize_gaussians.cpp libs/opensplat/ssim.cpp libs/opensplat/optim_scheduler.cpp libs/opensplat/colmap.cpp libs/opensplat/opensfm.cpp libs/opensplat/input_data.cpp
-libs/opensplat/tensor_math.cpp)
+file(GLOB_RECURSE OPENSPLAT_LIB_SRC_FILES "libs/opensplat/*.cpp")
+file(GLOB_RECURSE OPENSPLAT_LIB_VIZ_SRC_FILES "libs/opensplat/visualizer.cpp")
 
 if (OPENSPLAT_BUILD_VISUALIZER)
     if (Pangolin_FOUND)
         message(STATUS "Found Pangolin. Building visualizer (beta)")
-        list(APPEND OPENSPLAT_LIB_SRC_FILES libs/opensplat/visualizer.cpp)
         add_definitions(-DUSE_VISUALIZATION)
     else()
         message(FATAL "Pangolin not found. Cannot build visualizer (beta)")
     endif()
+else()
+    list(REMOVE_ITEM OPENSPLAT_LIB_SRC_FILES ${OPENSPLAT_LIB_VIZ_SRC_FILES} )
 endif()
 
+
+
 add_library(opensplat ${OPENSPLAT_LIB_SRC_FILES} )
-target_include_directories( opensplat PRIVATE libs/opensplat libs/rasterizer ${TORCH_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}
-)
+target_include_directories( opensplat PRIVATE libs/opensplat libs/rasterizer ${GPU_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} )
+if(GPU_RUNTIME STREQUAL "HIP")
+    target_compile_definitions(opensplat PRIVATE USE_HIP __HIP_PLATFORM_AMD__)
+elseif(GPU_RUNTIME STREQUAL "CUDA")
+    target_compile_definitions(opensplat PRIVATE USE_CUDA)
+elseif(GPU_RUNTIME STREQUAL "MPS")
+    target_compile_definitions(opensplat PRIVATE USE_MPS)
+endif()
+
+
 
 
 add_executable(opensplat_bin apps/opensplat.cpp)
@@ -286,13 +295,14 @@ elseif(GPU_RUNTIME STREQUAL "MPS")
 endif()
 
 if(OPENSPLAT_BUILD_SIMPLE_TRAINER)
-    add_executable(simple_trainer apps/simple_trainer.cpp libs/opensplat/project_gaussians.cpp libs/opensplat/rasterize_gaussians.cpp libs/opensplat/cv_utils.cpp)
+    add_executable(simple_trainer apps/simple_trainer.cpp )
     install(TARGETS simple_trainer DESTINATION bin)
     target_include_directories(simple_trainer PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/rasterizer
+        ${PROJECT_SOURCE_DIR}/libs/opensplat
         ${GPU_INCLUDE_DIRS}
     )
-    target_link_libraries(simple_trainer PUBLIC ${GPU_LIBRARIES} ${GSPLAT_LIBS} ${TORCH_LIBRARIES} ${OpenCV_LIBS})
+    target_link_libraries(simple_trainer PUBLIC opensplat ${GPU_LIBRARIES} ${GSPLAT_LIBS} ${TORCH_LIBRARIES} ${OpenCV_LIBS})
     target_link_libraries(simple_trainer PRIVATE
         nlohmann_json::nlohmann_json
         cxxopts::cxxopts
@@ -310,6 +320,7 @@ if(OPENSPLAT_BUILD_SIMPLE_TRAINER)
         target_compile_definitions(simple_trainer PRIVATE USE_MPS)
     endif()
 endif()
+
 
 # The following code block is suggested to be used on Windows.
 # According to https://github.com/pytorch/pytorch/issues/25457,
