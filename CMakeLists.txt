@@ -108,7 +108,7 @@ if(GPU_RUNTIME STREQUAL "CUDA")
 
             list(GET LIST_GPU_CODE 0 TARGET_GPU_CODE)
             set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=${TARGET_GPU_CODE}")
-
+            
             set(IDX 0)
             foreach(GPU_ARCH ${LIST_GPU_ARCH})
                 string(REGEX MATCH "compute_([0-9]+)" GPU_ARCH_VERSION "${GPU_ARCH}")
@@ -232,12 +232,9 @@ add_library(gsplat_cpu libs/rasterizer/gsplat-cpu/gsplat_cpu.cpp)
 target_include_directories(gsplat_cpu PRIVATE ${TORCH_INCLUDE_DIRS})
 
 
-
-
-
-
 file(GLOB_RECURSE OPENSPLAT_LIB_SRC_FILES "libs/opensplat/*.cpp")
 file(GLOB_RECURSE OPENSPLAT_LIB_VIZ_SRC_FILES "libs/opensplat/visualizer.cpp")
+
 
 if (OPENSPLAT_BUILD_VISUALIZER)
     if (Pangolin_FOUND)
@@ -252,8 +249,10 @@ endif()
 
 
 
+
 add_library(opensplat ${OPENSPLAT_LIB_SRC_FILES} )
 target_include_directories( opensplat PRIVATE libs/opensplat libs/rasterizer ${GPU_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} /usr/include/eigen3)
+
 if(GPU_RUNTIME STREQUAL "HIP")
     target_compile_definitions(opensplat PRIVATE USE_HIP __HIP_PLATFORM_AMD__)
 elseif(GPU_RUNTIME STREQUAL "CUDA")
@@ -337,3 +336,5 @@ if (MSVC)
         ${DLLS_TO_COPY}
         $<TARGET_FILE_DIR:opensplat>)
 endif (MSVC)
+
+add_compile_definitions(GLOG_USE_GLOG_EXPORT)
