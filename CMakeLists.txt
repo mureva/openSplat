@@ -46,7 +46,7 @@ FetchContent_Declare(nlohmann_json
 set(NANOFLANN_BUILD_EXAMPLES OFF)
 set(NANOFLANN_BUILD_TESTS OFF)
 FetchContent_Declare(nanoflann
-    URL https://github.com/jlblancoc/nanoflann/archive/refs/tags/v1.5.5.zip
+    URL https://github.com/jlblancoc/nanoflann/archive/refs/tags/v1.3.0.zip
 )
 FetchContent_Declare(cxxopts
     URL https://github.com/jarro2783/cxxopts/archive/refs/tags/v3.2.0.zip
@@ -181,7 +181,7 @@ if (NOT WIN32 AND NOT APPLE)
 endif()
 set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui opencv_calib3d)
 
-
+find_package(Eigen3 REQUIRED)
 
 set(GSPLAT_LIBS gsplat_cpu)
 if((GPU_RUNTIME STREQUAL "CUDA") OR (GPU_RUNTIME STREQUAL "HIP"))
@@ -253,7 +253,7 @@ endif()
 
 
 add_library(opensplat ${OPENSPLAT_LIB_SRC_FILES} )
-target_include_directories( opensplat PRIVATE libs/opensplat libs/rasterizer ${GPU_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} )
+target_include_directories( opensplat PRIVATE libs/opensplat libs/rasterizer ${GPU_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} /usr/include/eigen3)
 if(GPU_RUNTIME STREQUAL "HIP")
     target_compile_definitions(opensplat PRIVATE USE_HIP __HIP_PLATFORM_AMD__)
 elseif(GPU_RUNTIME STREQUAL "CUDA")
@@ -282,6 +282,7 @@ target_link_libraries(opensplat_bin PRIVATE
     nlohmann_json::nlohmann_json
     cxxopts::cxxopts
     nanoflann::nanoflann
+    Eigen3::Eigen
 )
 if (NOT WIN32)
     target_link_libraries(opensplat_bin PUBLIC pthread)
@@ -307,6 +308,7 @@ if(OPENSPLAT_BUILD_SIMPLE_TRAINER)
         nlohmann_json::nlohmann_json
         cxxopts::cxxopts
         nanoflann::nanoflann
+        Eigen3::Eigen
     )
     if (NOT WIN32)
         target_link_libraries(simple_trainer PUBLIC pthread)

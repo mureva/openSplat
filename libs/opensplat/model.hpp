@@ -4,6 +4,8 @@
 #include <iostream>
 #include <torch/torch.h>
 #include <torch/csrc/api/include/torch/version.h>
+#include <Eigen/Dense>
+
 #include "nerfstudio.hpp"
 #include "kdtree_tensor.hpp"
 #include "spherical_harmonics.hpp"
@@ -18,6 +20,8 @@ torch::Tensor randomQuatTensor(long long n);
 torch::Tensor projectionMatrix(float zNear, float zFar, float fovX, float fovY, const torch::Device &device);
 torch::Tensor psnr(const torch::Tensor& rendered, const torch::Tensor& gt);
 torch::Tensor l1(const torch::Tensor& rendered, const torch::Tensor& gt);
+
+torch::Tensor getScales( torch::Tensor in );
 
 struct Model{
   Model(const InputData &inputData, int numCameras,
@@ -38,7 +42,8 @@ struct Model{
     torch::manual_seed(42);
 
     means = inputData.points.xyz.to(device).requires_grad_();
-    scales = PointsTensor(inputData.points.xyz).scales().repeat({1, 3}).log().to(device).requires_grad_();
+    //scales = PointsTensor(inputData.points.xyz).scales().repeat({1, 3}).log().to(device).requires_grad_();
+    scales = getScales( inputData.points.xyz ).repeat( {1, 3} ).log().to(device).requires_grad_();
     quats = randomQuatTensor(numPoints).to(device).requires_grad_();
 
     int dimSh = numShBases(shDegree);
@@ -71,6 +76,7 @@ struct Model{
   void afterTrain(int step);
   void save(const std::string &filename, int step);
   void savePly(const std::string &filename, int step);
+  void savePlyText(const std::string &filename, int step);
   void saveSplat(const std::string &filename);
   void saveDebugPly(const std::string &filename, int step);
   int loadPly(const std::string &filename);

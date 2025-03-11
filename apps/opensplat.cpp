@@ -136,6 +136,8 @@ int main(int argc, char *argv[]){
         int imageSize = -1;
         size_t step = 1;
 
+        model.savePlyText("initial.ply", 0);
+
         if (resume != ""){
             step = model.loadPly(resume) + 1;
         }
@@ -146,7 +148,7 @@ int main(int argc, char *argv[]){
             model.optimizersZeroGrad();
 
             torch::Tensor rgb = model.forward(cam, step);
-            torch::Tensor gt = cam.getImage(model.getDownscaleFactor(step));
+            torch::Tensor gt  = cam.getImage(model.getDownscaleFactor(step));
             gt = gt.to(device);
 
             torch::Tensor mainLoss = model.mainLoss(rgb, gt, ssimWeight);
@@ -167,7 +169,10 @@ int main(int argc, char *argv[]){
                 torch::Tensor rgb = model.forward(*valCam, step);
                 cv::Mat image = tensorToImage(rgb.detach().cpu());
                 cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
-                cv::imwrite((fs::path(valRender) / (std::to_string(step) + ".png")).string(), image);
+                std::stringstream ss;
+                ss << valRender << "/" << std::setw(8) << std::setfill('0') << step << ".png";
+                cv::imwrite( ss.str(), image );
+                //cv::imwrite((fs::path(valRender) / (std::to_string(step) + ".png")).string(), image);
             }
 
 #ifdef USE_VISUALIZATION

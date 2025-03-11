@@ -21,6 +21,9 @@
 using namespace torch::indexing;
 namespace fs = std::filesystem;
 
+using torch::indexing::None;
+using torch::indexing::Slice;
+
 int main(int argc, char **argv){
     cxxopts::Options options("simple_trainer", "Test program for gsplat execution - " APP_VERSION);
     options.add_options()
