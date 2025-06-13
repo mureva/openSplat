@@ -217,19 +217,19 @@ __global__ void nd_rasterize_backward_kernelME(
         T *= ra;
         // rgbdh = rgbdhs[g];
         // update v_rgbdh for this gaussian
-		// ME notes:
-		//    gaussian position/scale should be affected by r,g,b loss, and maybe d loss
-		//    gaussian opacity should be affected by r,g,b, and d losses
-		//    gaussian r,g,b,d,h affected by r,g,b,d,h losses.
-		// I _think_ the easy thing is to skip alpha for the h channel? If we don't want 
-		// d to influence scales/positions then we need seperate v_alpha for opacity vs. sigma
+        // ME notes:
+        //    gaussian position/scale should be affected by r,g,b loss, and maybe d loss
+        //    gaussian opacity should be affected by r,g,b, and d losses
+        //    gaussian r,g,b,d,h affected by r,g,b,d,h losses.
+        // I _think_ the easy thing is to skip alpha for the h channel? If we don't want 
+        // d to influence scales/positions then we need seperate v_alpha for opacity vs. sigma
         const float fac = alpha * T;
         float v_alpha = 0.f;
         for (int c = 0; c < channels; ++c) {
             // gradient wrt rgbdh
             atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
-			if( c != 3 )
-			{
+            if( c != 4 )
+            {
                 // contribution from this pixel
                 v_alpha += (rgbdhs[channels * g + c] * T - S[c] * ra) * v_out[c];
                 // contribution from background pixel
