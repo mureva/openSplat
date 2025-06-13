@@ -253,6 +253,105 @@ __global__ void nd_rasterize_forward(
     }
 }
 
+
+__global__ void nd_rasterize_forwardME(
+    const dim3 tile_bounds,
+    const dim3 img_size,
+    const unsigned channels,
+    const int32_t* __restrict__ gaussian_ids_sorted,
+    const int2* __restrict__ tile_bins,
+    const float2* __restrict__ xys,
+    const float3* __restrict__ conics,
+    const float* __restrict__ colors,
+    const float* __restrict__ opacities,
+    float* __restrict__ final_Ts,
+    int* __restrict__ final_index,
+    float* __restrict__ out_img,
+    const float* __restrict__ background
+) {
+    // current naive implementation where tile data loading is redundant
+    // TODO tile data should be shared between tile threads
+    int32_t tile_id = blockIdx.y * tile_bounds.x + blockIdx.x;
+    unsigned i = blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned j = blockIdx.x * blockDim.x + threadIdx.x;
+    float px = (float)j;
+    float py = (float)i;
+    int32_t pix_id = i * img_size.x + j;
+
+    // return if out of bounds
+    if (i >= img_size.y || j >= img_size.x) {
+        return;
+    }
+
+    // which gaussians to look through in this tile
+    int2 range = tile_bins[tile_id];
+    float T = 1.f;
+
+    // iterate over all gaussians and apply rendering EWA equation (e.q. 2 from
+    // paper)
+    int idx;
+    for (idx = range.x; idx < range.y; ++idx) {
+        const int32_t g = gaussian_ids_sorted[idx];
+        const float3 conic = conics[g];
+        const float2 center = xys[g];
+        const float2 delta = {center.x - px, center.y - py};
+
+        // Mahalanobis distance (here referred to as sigma) measures how many
+        // standard deviations away distance delta is. sigma = -0.5(d.T * conic
+        // * d)
+        const float sigma =
+            0.5f * (conic.x * delta.x * delta.x + conic.z * delta.y * delta.y) +
+            conic.y * delta.x * delta.y;
+        if (sigma < 0.f) {
+            continue;
+        }
+        const float opac = opacities[g];
+
+        const float alpha = min(0.999f, opac * __expf(-sigma));
+
+        // break out conditions
+        if (alpha < 1.f / 255.f) {
+            continue;
+        }
+        const float next_T = T * (1.f - alpha);
+        if (next_T <= 1e-4f) {
+            // we want to render the last gaussian that contributes and note
+            // that here idx > range.x so we don't underflow
+            idx -= 1;
+            break;
+        }
+        const float vis = alpha * T;
+        for (int c = 0; c < channels; ++c) {
+            out_img[channels * pix_id + c] += colors[channels * g + c] * vis;
+        }
+        T = next_T;
+    }
+    final_Ts[pix_id] = T; // transmittance at last gaussian in this pixel
+    final_index[pix_id] =
+        (idx == range.y)
+            ? idx - 1
+            : idx; // index of in bin of last gaussian in this pixel
+    for (int c = 0; c < channels; ++c) {
+        out_img[channels * pix_id + c] += T * background[c];
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 __global__ void rasterize_forward(
     const dim3 tile_bounds,
     const dim3 img_size,

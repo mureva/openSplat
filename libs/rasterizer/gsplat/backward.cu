@@ -128,6 +128,146 @@ __global__ void nd_rasterize_backward_kernel(
     }
 }
 
+
+
+
+
+
+
+__global__ void nd_rasterize_backward_kernelME(
+    const dim3 tile_bounds,
+    const dim3 img_size,
+    const unsigned channels,
+    const int32_t* __restrict__ gaussians_ids_sorted,
+    const int2* __restrict__ tile_bins,
+    const float2* __restrict__ xys,
+    const float3* __restrict__ conics,
+    const float* __restrict__ rgbdhs,
+    const float* __restrict__ opacities,
+    const float* __restrict__ background,
+    const float* __restrict__ final_Ts,
+    const int* __restrict__ final_index,
+    const float* __restrict__ v_output,
+    const float* __restrict__ v_output_alpha,
+    float2* __restrict__ v_xy,
+    float3* __restrict__ v_conic,
+    float* __restrict__ v_rgbdh,
+    float* __restrict__ v_opacity,
+    float* __restrict__ workspace
+) {
+    if (channels > MAX_REGISTER_CHANNELS && workspace == nullptr) {
+        return;
+    }
+    // current naive implementation where tile data loading is redundant
+    // TODO tile data should be shared between tile threads
+    int32_t tile_id = blockIdx.y * tile_bounds.x + blockIdx.x;
+    unsigned i = blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned j = blockIdx.x * blockDim.x + threadIdx.x;
+    float px = (float)j;
+    float py = (float)i;
+    int32_t pix_id = i * img_size.x + j;
+
+    // return if out of bounds
+    if (i >= img_size.y || j >= img_size.x) {
+        return;
+    }
+
+    // which gaussians get gradients for this pixel
+    int2 range = tile_bins[tile_id];
+    // df/d_out for this pixel
+    const float *v_out = &(v_output[channels * pix_id]);
+    const float v_out_alpha = v_output_alpha[pix_id];
+    // this is the T AFTER the last gaussian in this pixel
+    float T_final = final_Ts[pix_id];
+    float T = T_final;
+    // the contribution from gaussians behind the current one
+    float buffer[MAX_REGISTER_CHANNELS] = {0.f};
+    float *S;
+    if (channels <= MAX_REGISTER_CHANNELS) {
+        S = &buffer[0];
+    } else {
+        S = &workspace[channels * pix_id];
+    }
+    int bin_final = final_index[pix_id];
+
+    // iterate backward to compute the jacobians wrt rgbdh, opacity, mean2d, and
+    // conic recursively compute T_{n-1} from T_n, where T_i = prod(j < i) (1 -
+    // alpha_j), and S_{n-1} from S_n, where S_j = sum_{i > j}(rgb_i * alpha_i *
+    // T_i) df/dalpha_i = rgb_i * T_i - S_{i+1| / (1 - alpha_i)
+    for (int idx = bin_final - 1; idx >= range.x; --idx) {
+        const int32_t g = gaussians_ids_sorted[idx];
+        const float3 conic = conics[g];
+        const float2 center = xys[g];
+        const float2 delta = {center.x - px, center.y - py};
+        const float sigma =
+            0.5f * (conic.x * delta.x * delta.x + conic.z * delta.y * delta.y) +
+            conic.y * delta.x * delta.y;
+        if (sigma < 0.f) {
+            continue;
+        }
+        const float opac = opacities[g];
+        const float vis = __expf(-sigma);
+        const float alpha = min(0.99f, opac * vis);
+        if (alpha < 1.f / 255.f) {
+            continue;
+        }
+
+        // compute the current T for this gaussian
+        const float ra = 1.f / (1.f - alpha);
+        T *= ra;
+        // rgbdh = rgbdhs[g];
+        // update v_rgbdh for this gaussian
+		// ME notes:
+		//    gaussian position/scale should be affected by r,g,b loss, and maybe d loss
+		//    gaussian opacity should be affected by r,g,b, and d losses
+		//    gaussian r,g,b,d,h affected by r,g,b,d,h losses.
+		// I _think_ the easy thing is to skip alpha for the h channel? If we don't want 
+		// d to influence scales/positions then we need seperate v_alpha for opacity vs. sigma
+        const float fac = alpha * T;
+        float v_alpha = 0.f;
+        for (int c = 0; c < channels; ++c) {
+            // gradient wrt rgbdh
+            atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
+			if( c != 3 )
+			{
+                // contribution from this pixel
+                v_alpha += (rgbdhs[channels * g + c] * T - S[c] * ra) * v_out[c];
+                // contribution from background pixel
+                v_alpha += -T_final * ra * background[c] * v_out[c];
+            }
+            // update the running sum
+            S[c] += rgbdhs[channels * g + c] * fac;
+        }
+        v_alpha += T_final * ra * v_out_alpha;
+        // update v_opacity for this gaussian
+        atomicAdd(&(v_opacity[g]), vis * v_alpha);
+
+        // compute vjps for conics and means
+        // d_sigma / d_delta = conic * delta
+        // d_sigma / d_conic = delta * delta.T
+        const float v_sigma = -opac * vis * v_alpha;
+
+        atomicAdd(&(v_conic[g].x), 0.5f * v_sigma * delta.x * delta.x);
+        atomicAdd(&(v_conic[g].y), 0.5f * v_sigma * delta.x * delta.y);
+        atomicAdd(&(v_conic[g].z), 0.5f * v_sigma * delta.y * delta.y);
+        atomicAdd(
+            &(v_xy[g].x), v_sigma * (conic.x * delta.x + conic.y * delta.y)
+        );
+        atomicAdd(
+            &(v_xy[g].y), v_sigma * (conic.y * delta.x + conic.z * delta.y)
+        );
+    }
+}
+
+
+
+
+
+
+
+
+
+
 inline __device__ void warpSum3(float3& val, cg::thread_block_tile<32>& tile){
 #ifdef USE_HIP
     val.x = warp_reduce_sum(val.x, WARP_SIZE);

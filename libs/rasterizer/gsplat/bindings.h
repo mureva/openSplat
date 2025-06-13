@@ -111,8 +111,8 @@ torch::Tensor get_tile_bin_edges_tensor(
 std::tuple<
     torch::Tensor,
     torch::Tensor,
-    torch::Tensor
-> rasterize_forward_tensor(
+    torch::Tensor >
+rasterize_forward_tensor(
     const std::tuple<int, int, int> tile_bounds,
     const std::tuple<int, int, int> block,
     const std::tuple<int, int, int> img_size,
@@ -128,8 +128,8 @@ std::tuple<
 std::tuple<
     torch::Tensor,
     torch::Tensor,
-    torch::Tensor
-> nd_rasterize_forward_tensor(
+    torch::Tensor >
+nd_rasterize_forward_tensor(
     const std::tuple<int, int, int> tile_bounds,
     const std::tuple<int, int, int> block,
     const std::tuple<int, int, int> img_size,
@@ -188,3 +188,47 @@ std::
         const torch::Tensor &v_output, // dL_dout_color
         const torch::Tensor &v_output_alpha
     );
+
+
+
+
+std::tuple<
+    torch::Tensor,
+    torch::Tensor,
+    torch::Tensor >
+nd_rasterize_forward_tensorME(
+    const std::tuple<int, int, int> tile_bounds,
+    const std::tuple<int, int, int> block,
+    const std::tuple<int, int, int> img_size,
+    const torch::Tensor &gaussian_ids_sorted,
+    const torch::Tensor &tile_bins,
+    const torch::Tensor &xys,
+    const torch::Tensor &conics,
+    const torch::Tensor &colors,
+    const torch::Tensor &opacities,
+    const torch::Tensor &background
+);
+
+
+std::
+    tuple<
+        torch::Tensor, // dL_dxy
+        torch::Tensor, // dL_dconic
+        torch::Tensor, // dL_dcolors
+        torch::Tensor  // dL_dopacity
+        >
+nd_rasterize_backward_tensorME(
+    const unsigned img_height,
+    const unsigned img_width,
+    const torch::Tensor &gaussians_ids_sorted,
+    const torch::Tensor &tile_bins,
+    const torch::Tensor &xys,
+    const torch::Tensor &conics,
+    const torch::Tensor &colors,
+    const torch::Tensor &opacities,
+    const torch::Tensor &background,
+    const torch::Tensor &final_Ts,
+    const torch::Tensor &final_idx,
+    const torch::Tensor &v_output, // dL_dout_color
+    const torch::Tensor &v_output_alpha
+);
