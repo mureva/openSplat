@@ -18,8 +18,13 @@ InputData inputDataFromColmap(const std::string &projectRoot){
 
     fs::path camerasPath = cmRoot / "cameras.bin";
     fs::path imagesPath = cmRoot / "images.bin";
-    fs::path pointsPath = cmRoot / "points3D.bin";
     
+	fs::path pointsPath = cmRoot / "points3D.bin";
+	if( !fs::exists( pointsPath ) )
+	{
+		pointsPath = cmRoot / "points3D.ply";
+	}    
+
     if (!fs::exists(camerasPath)) throw std::runtime_error(camerasPath.string() + " does not exist");
     if (!fs::exists(imagesPath)) throw std::runtime_error(imagesPath.string() + " does not exist");
     if (!fs::exists(pointsPath)) throw std::runtime_error(pointsPath.string() + " does not exist");
