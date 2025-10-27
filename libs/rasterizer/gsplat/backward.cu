@@ -229,7 +229,7 @@ __global__ void nd_rasterize_backward_kernelME(
         for (int c = 0; c < channels; ++c) {
             // gradient wrt rgbdh
             atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
-            //if( c != 4 )
+            if( c < 4 ) // so let rgbd add to alpha and thus position and scale, but not h,e,s renders
             {
                 // contribution from this pixel
                 v_alpha += (rgbdhs[channels * g + c] * T - S[c] * ra) * v_out[c];
