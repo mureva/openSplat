@@ -320,9 +320,18 @@ __global__ void nd_rasterize_forwardME(
             idx -= 1;
             break;
         }
+        
+        // colour channels are r,g,b,d,  h,e,s
+        //                     0,1,2,3,  4,5,6
         const float vis = alpha * T;
         for (int c = 0; c < channels; ++c) {
-            out_img[channels * pix_id + c] += colors[channels * g + c] * vis;
+            if( c != 4 )
+                out_img[channels * pix_id + c] += colors[channels * g + c] * vis;
+            else
+            {
+                const float d = colors[ channels * g + c ] - vis;
+                out_img[channels * pix_id + c] += d*d;
+            }
         }
         T = next_T;
     }

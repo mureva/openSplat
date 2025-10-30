@@ -226,18 +226,29 @@ __global__ void nd_rasterize_backward_kernelME(
         // later note: Maybe I don't want to do that... maybe letting h affect everything is _good_?
         const float fac = alpha * T;
         float v_alpha = 0.f;
-        for (int c = 0; c < channels; ++c) {
-            // gradient wrt rgbdh
-            atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
-            if( c < 4 ) // so let rgbd add to alpha and thus position and scale, but not h,e,s renders
+        for (int c = 0; c < channels; ++c)
+        {
+            if( c != 4 )
             {
-                // contribution from this pixel
-                v_alpha += (rgbdhs[channels * g + c] * T - S[c] * ra) * v_out[c];
-                // contribution from background pixel
-                v_alpha += -T_final * ra * background[c] * v_out[c];
+                // gradient wrt rgbd,  e,s
+                atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
+                
+                if( c < 4 )
+                {
+                    // contribution from this pixel
+                    v_alpha += (rgbdhs[channels * g + c] * T - S[c] * ra) * v_out[c];
+                    // contribution from background pixel
+                    v_alpha += -T_final * ra * background[c] * v_out[c];
+                }
+                
+                // update the running sum
+                S[c] += rgbdhs[channels * g + c] * fac;   
             }
-            // update the running sum
-            S[c] += rgbdhs[channels * g + c] * fac;
+            else
+            {
+                const float d = rgbdhs[channels * g + c] - fac;
+                atomicAdd(&(v_rgbdh[channels * g + c]), d * v_out[c]);
+            }    
         }
         v_alpha += T_final * ra * v_out_alpha;
         // update v_opacity for this gaussian
