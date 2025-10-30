@@ -324,13 +324,14 @@ __global__ void nd_rasterize_forwardME(
         // colour channels are r,g,b,d,  h,e,s
         //                     0,1,2,3,  4,5,6
         const float vis = alpha * T;
+        const float hval0 = colors[channels * g + 4] - (T*opac);
+        const float hval  = hval0*hval0;
         for (int c = 0; c < channels; ++c) {
             if( c != 4 )
                 out_img[channels * pix_id + c] += colors[channels * g + c] * vis;
             else
             {
-                const float d = colors[ channels * g + c ] - vis;
-                out_img[channels * pix_id + c] += d*d;
+                out_img[channels * pix_id + c] += hval * vis;
             }
         }
         T = next_T;
@@ -341,7 +342,8 @@ __global__ void nd_rasterize_forwardME(
             ? idx - 1
             : idx; // index of in bin of last gaussian in this pixel
     for (int c = 0; c < channels; ++c) {
-        out_img[channels * pix_id + c] += T * background[c];
+        if( c != 4 )
+            out_img[channels * pix_id + c] += T * background[c];
     }
 }
 

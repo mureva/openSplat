@@ -226,6 +226,8 @@ __global__ void nd_rasterize_backward_kernelME(
         // later note: Maybe I don't want to do that... maybe letting h affect everything is _good_?
         const float fac = alpha * T;
         float v_alpha = 0.f;
+        const float hval0 = rgbdhs[channels * g + 4] - (T*opac);
+        
         for (int c = 0; c < channels; ++c)
         {
             if( c != 4 )
@@ -247,7 +249,7 @@ __global__ void nd_rasterize_backward_kernelME(
             else
             {
                 const float d = rgbdhs[channels * g + c] - fac;
-                atomicAdd(&(v_rgbdh[channels * g + c]), d * v_out[c]);
+                atomicAdd(&(v_rgbdh[channels * g + c]), hval0 * fac * v_out[c]);
             }    
         }
         v_alpha += T_final * ra * v_out_alpha;
