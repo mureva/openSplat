@@ -321,19 +321,27 @@ __global__ void nd_rasterize_forwardME(
             break;
         }
         
-        // colour channels are r,g,b,d,  h,e,s
+        // colour channels are r,g,b,d,  e,h,hl
         //                     0,1,2,3,  4,5,6
         const float vis = alpha * T;
-        const float hval0 = colors[channels * g + 4] - (T*opac);
-        const float hval  = hval0*hval0;
-        for (int c = 0; c < channels; ++c) {
-            if( c != 4 )
-                out_img[channels * pix_id + c] += colors[channels * g + c] * vis;
-            else
-            {
-                out_img[channels * pix_id + c] += hval * vis;
-            }
+        int c = 0;
+        while( c < channels-1 )
+        {
+            out_img[channels * pix_id + c] += colors[channels * g + c] * vis;
+            ++c;
         }
+        
+        // "render" the contribution to the loss given error between `h` and render weight.
+        // compute h error
+        const float herr  = (T*opac) - colors[channels * g + c];
+        
+        // compute hloss. We're more interested in when this region of space _does_ have 
+        // have high render weight, rather than when it doesn't. 
+        // herr will be > 0 when h needs to increase, make that much stronger than 
+        // the need to decrease.
+        const float hval  = 1e-2f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
+        out_img[channels * pix_id + c ] += hval * vis;
+        
         T = next_T;
     }
     final_Ts[pix_id] = T; // transmittance at last gaussian in this pixel

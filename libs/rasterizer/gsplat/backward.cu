@@ -226,32 +226,33 @@ __global__ void nd_rasterize_backward_kernelME(
         // later note: Maybe I don't want to do that... maybe letting h affect everything is _good_?
         const float fac = alpha * T;
         float v_alpha = 0.f;
-        const float hval0 = rgbdhs[channels * g + 4] - (T*opac);
         
-        for (int c = 0; c < channels; ++c)
+        
+        int c = 0;
+        while( c < channels-1 )
         {
-            if( c != 4 )
+            // gradient wrt rgbd,  e,s
+            atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
+            
+            if( c < 4 )
             {
-                // gradient wrt rgbd,  e,s
-                atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
-                
-                if( c < 4 )
-                {
-                    // contribution from this pixel
-                    v_alpha += (rgbdhs[channels * g + c] * T - S[c] * ra) * v_out[c];
-                    // contribution from background pixel
-                    v_alpha += -T_final * ra * background[c] * v_out[c];
-                }
-                
-                // update the running sum
-                S[c] += rgbdhs[channels * g + c] * fac;   
+                // contribution from this pixel
+                v_alpha += (rgbdhs[channels * g + c] * T - S[c] * ra) * v_out[c];
+                // contribution from background pixel
+                v_alpha += -T_final * ra * background[c] * v_out[c];
             }
-            else
-            {
-                const float d = rgbdhs[channels * g + c] - fac;
-                atomicAdd(&(v_rgbdh[channels * g + c]), hval0 * fac * v_out[c]);
-            }    
+            
+            // update the running sum
+            S[c] += rgbdhs[channels * g + c] * fac;   
+            ++c;
         }
+        
+        
+        const float herr  = (T*opac) - rgbdhs[channels * g + c];
+        //const float hval  = 1e-2*herr*min(0,herr) + herr*max(0,herr);
+        const float gval = (herr < 0.0f) ? (2.0f * 1e-2 * herr) : (2.0f * herr);
+        atomicAdd(&(v_rgbdh[channels * g + c]), -gval * fac * v_out[c]);
+        
         v_alpha += T_final * ra * v_out_alpha;
         // update v_opacity for this gaussian
         atomicAdd(&(v_opacity[g]), vis * v_alpha);
