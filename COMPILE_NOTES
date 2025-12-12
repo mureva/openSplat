@@ -1,0 +1,5 @@
+Had to put in some explicit deps
+
+Easier to use downloaded libtorch that to use vcpkg
+
+Had to completely comment out libtorch/cmake/protobuf-targets.cmake file to make things compile.
