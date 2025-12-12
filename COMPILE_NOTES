@@ -3,3 +3,12 @@ Had to put in some explicit deps
 Easier to use downloaded libtorch that to use vcpkg
 
 Had to completely comment out libtorch/cmake/protobuf-targets.cmake file to make things compile.
+
+
+Needed loads of configure options and to use cmake from vcpkg:
+
+..\..\vcpkg\downloads\tools\cmake-3.30.1-windows\cmake-3.30.1-windows-i386\bin\cmake ../ -D Torch_DIR=D:\murray\programming\libtorch\share\cmake\Torch\ -D OpenCV_DIR=D:\murray\programming\vcpkg\installed\x64-windows\share\opencv4\ -D Protobuf_DIR=D:\murray\programming\libtorch\cmake\ -D USE_SYSTEM_PROTOBUF=OFF -DCMAKE_TOOLCHAIN_FILE="D:\murray\programming\vcpkg\scripts\buildsystems\vcpkg.cmake" -DWITH_PROTOBUF=OFF -D HDF5_DIR=D:\murray\programming\vcpkg\installed\x64-windows\share\hdf5\ -DZLIB_ROOT=D:\murray\programming\vcpkg\installed\x64-windows -Dlibaec_ROOT="D:\murray\programming\vcpkg\installed\x64-windows" -DTesseract_ROOT="D:\murray\programming\vcpkg\installed\x64-windows" -Dquirc_ROOT="D:\murray\programming\vcpkg\installed\x64-windows" -Dgflags_ROOT="D:\murray\programming\vcpkg\installed\x64-windows" -DCeres_ROOT="D:\murray\programming\vcpkg\installed\x64-windows" -DTIFF_ROOT="D:\murray\programming\vcpkg\installed\x64-windows" -DCMAKE_INCLUDE_PATH="D:\murray\programming\opensplat\build\_deps\nanoflann-src\include" -DCMAKE_INCLUDE_PATH="D:\murray\programming\opensplat\build\_deps\nlohmann_json-src\include" -DCMAKE_CUDA_FLAGS="-DNOMINMAX -D__STDC_LIMIT_MACROS -DUSE_CUDA"
+
+Then to build:
+
+..\..\vcpkg\downloads\tools\cmake-3.30.1-windows\cmake-3.30.1-windows-i386\bin\cmake --build . --config Release --target opensplat_bin
