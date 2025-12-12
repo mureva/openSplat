@@ -251,7 +251,7 @@ endif()
 
 
 add_library(opensplat ${OPENSPLAT_LIB_SRC_FILES} )
-target_include_directories( opensplat PRIVATE libs/opensplat libs/rasterizer ${GPU_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} /usr/include/eigen3)
+target_include_directories( opensplat PRIVATE libs/opensplat libs/rasterizer ${GPU_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} /usr/include/eigen3 D:/murray/programming/opensplat/build/_deps/nanoflann-src/include D:/murray/programming/opensplat/build/_deps/nlohmann_json-src/include D:/murray/programming/vcpkg/installed/x64-windows/include/)
 
 if(GPU_RUNTIME STREQUAL "HIP")
     target_compile_definitions(opensplat PRIVATE USE_HIP __HIP_PLATFORM_AMD__)

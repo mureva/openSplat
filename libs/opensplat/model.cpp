@@ -872,7 +872,7 @@ torch::Tensor getScales( torch::Tensor in )
 	
 	int count = 4;
 	std::vector<float>  query(3);
-	std::vector<long>  indices(count);
+	std::vector<__int64>  indices(count);
 	std::vector<float> sqr_dists(count);
 
 	std::vector<float> buf( V.rows() );
