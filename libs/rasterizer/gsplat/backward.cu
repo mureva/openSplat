@@ -205,12 +205,18 @@ __global__ void nd_rasterize_backward_kernelME(
         if (sigma < 0.f) {
             continue;
         }
+        
+        
+        
         const float opac = opacities[g];
         const float vis = __expf(-sigma);
         const float alpha = min(0.99f, opac * vis);
         if (alpha < 1.f / 255.f) {
             continue;
         }
+        
+        // ME: sigma, and thus vis, are based on distance from centre of gaussian.
+        //     alpha is thus weighted opacity.
 
         // compute the current T for this gaussian
         const float ra = 1.f / (1.f - alpha);
@@ -226,6 +232,8 @@ __global__ void nd_rasterize_backward_kernelME(
         // later note: Maybe I don't want to do that... maybe letting h affect everything is _good_?
         const float fac = alpha * T;
         float v_alpha = 0.f;
+        
+        // fac is thus the current render weight wrt opacity and distance from gaussian centre.
         
         
         int c = 0;
@@ -247,13 +255,19 @@ __global__ void nd_rasterize_backward_kernelME(
             ++c;
         }
         
+        // from forward:
+        //const float herr  = fac - ( vis * colors[channels * g + c] );
+        //const float hval  = 1e-2f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
+        //
+        // then derivative should be: (yay gemini!)
+        // dxd​f(x)= −2 * 1e-2 * vis * min(0,herr) − 2*vis*max(0,herr)
+        const float herr  = fac - ( vis * rgbdhs[channels * g + c] );
+        const float gval = -2.0 * 1e-2 * vis * min(0.0f, herr) - 2*vis*max(0.0f,herr);
         
-        const float herr  = (T*opac) - rgbdhs[channels * g + c];
-        //const float hval  = 1e-2*herr*min(0,herr) + herr*max(0,herr);
-        const float gval = (herr < 0.0f) ? (2.0f * 1e-2 * herr) : (2.0f * herr);
-        atomicAdd(&(v_rgbdh[channels * g + c]), -gval * fac * v_out[c]);
+        atomicAdd(&(v_rgbdh[channels * g + c]), gval * v_out[c]);
         
         v_alpha += T_final * ra * v_out_alpha;
+
         // update v_opacity for this gaussian
         atomicAdd(&(v_opacity[g]), vis * v_alpha);
 

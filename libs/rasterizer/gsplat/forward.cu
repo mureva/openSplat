@@ -306,8 +306,10 @@ __global__ void nd_rasterize_forwardME(
             continue;
         }
         const float opac = opacities[g];
-
-        const float alpha = min(0.999f, opac * __expf(-sigma));
+        
+        // alpha is opacity weighted by distance from gaussian centre
+        const float vis = __expf(-sigma);
+        const float alpha = min(0.999f, opac * vis);
 
         // break out conditions
         if (alpha < 1.f / 255.f) {
@@ -321,26 +323,44 @@ __global__ void nd_rasterize_forwardME(
             break;
         }
         
+        // fac is thus the current render weight - transmittance * weighted opacity
+        const float fac = alpha * T;
+        
         // colour channels are r,g,b,d,  e,h,hl
         //                     0,1,2,3,  4,5,6
-        const float vis = alpha * T;
         int c = 0;
         while( c < channels-1 )
         {
-            out_img[channels * pix_id + c] += colors[channels * g + c] * vis;
+            out_img[channels * pix_id + c] += colors[channels * g + c] * fac;
             ++c;
         }
         
-        // "render" the contribution to the loss given error between `h` and render weight.
-        // compute h error
-        const float herr  = (T*opac) - colors[channels * g + c];
+        //
+        // what do we want 'h' to be? 
+        // we intuit that it mirrors the render weight of a gaussian.
+        // if it's a front surfae, high weight, a hidden surface, low weight.
+        // But that intuition only holds when we view a surface from one direction.
+        // As such, we rather think of `h` as the "maximum" render weight.
+        // or, we just make it much easier to _increase_ h than it is to decrease it.
+        //
+        // That part is easy enough, but then we have to consider that "fac" is affected
+        // by the shape of the gaussian - get further from the gaussian centre and "fac" goes
+        // down - so the apparent render weight also goes down.
+        //
+        // So when we learn a value for `h` we have to account for that.
+        // The easiest way is to apply "vis" to the `h` value before we use it.
+        //
+        // Now what we render is just a sum of the differences between the real render weight
+        // and the `h` value at this gaussian.
+        //
+        const float herr  = fac - ( vis * colors[channels * g + c] );
         
         // compute hloss. We're more interested in when this region of space _does_ have 
         // have high render weight, rather than when it doesn't. 
         // herr will be > 0 when h needs to increase, make that much stronger than 
         // the need to decrease.
         const float hval  = 1e-2f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
-        out_img[channels * pix_id + c ] += hval * vis;
+        out_img[channels * pix_id + c ] += hval;
         
         T = next_T;
     }
