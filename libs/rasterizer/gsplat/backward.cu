@@ -262,7 +262,7 @@ __global__ void nd_rasterize_backward_kernelME(
         // then derivative should be: (yay gemini!)
         // dxd​f(x)= −2 * 1e-2 * vis * min(0,herr) − 2*vis*max(0,herr)
         const float herr  = fac - ( vis * rgbdhs[channels * g + c] );
-        const float gval = -2.0 * 1e-2 * vis * min(0.0f, herr) - 2*vis*max(0.0f,herr);
+        const float gval = -2.0 * 5e-1 * vis * min(0.0f, herr) - 2*vis*max(0.0f,herr);
         
         atomicAdd(&(v_rgbdh[channels * g + c]), gval * v_out[c]);
         

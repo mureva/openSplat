@@ -359,7 +359,7 @@ __global__ void nd_rasterize_forwardME(
         // have high render weight, rather than when it doesn't. 
         // herr will be > 0 when h needs to increase, make that much stronger than 
         // the need to decrease.
-        const float hval  = 1e-2f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
+        const float hval  = 5e-1f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
         out_img[channels * pix_id + c ] += hval;
         
         T = next_T;
