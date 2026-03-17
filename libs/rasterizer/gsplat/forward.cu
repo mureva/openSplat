@@ -284,8 +284,10 @@ __global__ void nd_rasterize_forwardME(
     }
 
     // which gaussians to look through in this tile
-    int2 range = tile_bins[tile_id];
-    float T = 1.f;
+    int2 range  = tile_bins[tile_id];
+    float T     = 1.f;
+    float sumd2 = 0.0f;
+    float sumw  = 0.0f;
 
     // iterate over all gaussians and apply rendering EWA equation (e.q. 2 from
     // paper)
@@ -315,19 +317,14 @@ __global__ void nd_rasterize_forwardME(
         if (alpha < 1.f / 255.f) {
             continue;
         }
-        const float next_T = T * (1.f - alpha);
-        if (next_T <= 1e-4f) {
-            // we want to render the last gaussian that contributes and note
-            // that here idx > range.x so we don't underflow
-            idx -= 1;
-            break;
-        }
+        
         
         // fac is thus the current render weight - transmittance * weighted opacity
         const float fac = alpha * T;
         
-        // colour channels are r,g,b,d,  e,h,hl
-        //                     0,1,2,3,  4,5,6
+        //
+        // colour channels are r,g,b,d,  e,s,h,  v
+        //                     0,1,2,3,  4,5,6,  7
         int c = 0;
         while( c < channels-1 )
         {
@@ -335,33 +332,16 @@ __global__ void nd_rasterize_forwardME(
             ++c;
         }
         
-        //
-        // what do we want 'h' to be? 
-        // we intuit that it mirrors the render weight of a gaussian.
-        // if it's a front surfae, high weight, a hidden surface, low weight.
-        // But that intuition only holds when we view a surface from one direction.
-        // As such, we rather think of `h` as the "maximum" render weight.
-        // or, we just make it much easier to _increase_ h than it is to decrease it.
-        //
-        // That part is easy enough, but then we have to consider that "fac" is affected
-        // by the shape of the gaussian - get further from the gaussian centre and "fac" goes
-        // down - so the apparent render weight also goes down.
-        //
-        // So when we learn a value for `h` we have to account for that.
-        // The easiest way is to apply "vis" to the `h` value before we use it.
-        //
-        // Now what we render is just a sum of the differences between the real render weight
-        // and the `h` value at this gaussian.
-        //
-        const float herr  = fac - ( vis * colors[channels * g + c] );
+        d2sum += ( colors[ channels * g + 3 ] *  colors[ channels * g + 3 ] ) * fac;
+        wsum  += fac;
         
-        // compute hloss. We're more interested in when this region of space _does_ have 
-        // have high render weight, rather than when it doesn't. 
-        // herr will be > 0 when h needs to increase, make that much stronger than 
-        // the need to decrease.
-        const float hval  = 5e-1f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
-        out_img[channels * pix_id + c ] += hval;
-        
+        const float next_T = T * (1.f - alpha);
+        if (next_T <= 1e-4f) {
+            // we want to render the last gaussian that contributes and note
+            // that here idx > range.x so we don't underflow
+            idx -= 1;
+            break;
+        }
         T = next_T;
     }
     final_Ts[pix_id] = T; // transmittance at last gaussian in this pixel
@@ -369,10 +349,16 @@ __global__ void nd_rasterize_forwardME(
         (idx == range.y)
             ? idx - 1
             : idx; // index of in bin of last gaussian in this pixel
-    for (int c = 0; c < channels; ++c) {
-        if( c != 4 )
+    
+    for (int c = 0; c < channels-1; ++c)
+    {
             out_img[channels * pix_id + c] += T * background[c];
     }
+    
+    // complete incremental variance calculation
+    // float variance_z = (depth_sq_sum / (weight_sum + 1e-7f)) - (mean_z * mean_z);
+    float d = out_img[ channels * pix_id + 3 ]
+    out_img[ channels * pix_id + channels ] = ( d2sum / (wsum + 1e-7 ) ) - (d*d);
 }
 
 
