@@ -287,7 +287,6 @@ __global__ void nd_rasterize_forwardME(
     int2 range  = tile_bins[tile_id];
     float T     = 1.f;
     float sumd2 = 0.0f;
-    float sumw  = 0.0f;
 
     // iterate over all gaussians and apply rendering EWA equation (e.q. 2 from
     // paper)
@@ -323,8 +322,8 @@ __global__ void nd_rasterize_forwardME(
         const float fac = alpha * T;
         
         //
-        // colour channels are r,g,b,d,  e,s,h,  v
-        //                     0,1,2,3,  4,5,6,  7
+        // colour channels are r,g,b,d,  e,s,  v
+        //                     0,1,2,3,  4,5,  6
         int c = 0;
         while( c < channels-1 )
         {
@@ -332,8 +331,8 @@ __global__ void nd_rasterize_forwardME(
             ++c;
         }
         
-        d2sum += ( colors[ channels * g + 3 ] *  colors[ channels * g + 3 ] ) * fac;
-        wsum  += fac;
+        sumd2 += ( colors[ channels * g + 3 ] *  colors[ channels * g + 3 ] ) * fac;
+        
         
         const float next_T = T * (1.f - alpha);
         if (next_T <= 1e-4f) {
@@ -344,21 +343,29 @@ __global__ void nd_rasterize_forwardME(
         }
         T = next_T;
     }
-    final_Ts[pix_id] = T; // transmittance at last gaussian in this pixel
+        
+    for (int c = 0; c < channels-1; ++c)
+    {
+            out_img[channels * pix_id + c] += T * background[c];
+    }
+    sumd2 += T * (background[3]*background[3]);
+    
+    // complete incremental variance calculation
+    // float variance_z = (depth_sq_sum / (weight_sum + 1e-7f)) - (mean_z * mean_z);
+    float d = out_img[ channels * pix_id + 3 ];
+    out_img[ channels * pix_id + channels-1 ] = sumd2 - (d*d);
+    
+    
+    final_Ts[pix_id * 3 + 0] = T;                                         // transmittance at last gaussian in this pixel
+    final_Ts[pix_id * 3 + 1] = d;                                         // store rendered depth
+    final_Ts[pix_id * 3 + 2] = out_img[ channels * pix_id + channels-1];  // store variance
+    
     final_index[pix_id] =
         (idx == range.y)
             ? idx - 1
             : idx; // index of in bin of last gaussian in this pixel
     
-    for (int c = 0; c < channels-1; ++c)
-    {
-            out_img[channels * pix_id + c] += T * background[c];
-    }
     
-    // complete incremental variance calculation
-    // float variance_z = (depth_sq_sum / (weight_sum + 1e-7f)) - (mean_z * mean_z);
-    float d = out_img[ channels * pix_id + 3 ]
-    out_img[ channels * pix_id + channels ] = ( d2sum / (wsum + 1e-7 ) ) - (d*d);
 }
 
 

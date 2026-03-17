@@ -142,7 +142,7 @@ __global__ void nd_rasterize_backward_kernelME(
     const int2* __restrict__ tile_bins,
     const float2* __restrict__ xys,
     const float3* __restrict__ conics,
-    const float* __restrict__ rgbdhs,
+    const float* __restrict__ colors,
     const float* __restrict__ opacities,
     const float* __restrict__ background,
     const float* __restrict__ final_Ts,
@@ -151,7 +151,7 @@ __global__ void nd_rasterize_backward_kernelME(
     const float* __restrict__ v_output_alpha,
     float2* __restrict__ v_xy,
     float3* __restrict__ v_conic,
-    float* __restrict__ v_rgbdh,
+    float* __restrict__ v_color,
     float* __restrict__ v_opacity,
     float* __restrict__ workspace
 ) {
@@ -178,7 +178,10 @@ __global__ void nd_rasterize_backward_kernelME(
     const float *v_out = &(v_output[channels * pix_id]);
     const float v_out_alpha = v_output_alpha[pix_id];
     // this is the T AFTER the last gaussian in this pixel
-    float T_final = final_Ts[pix_id];
+    float T_final = final_Ts[pix_id * 3 + 0];
+	float renD    = final_Ts[pix_id * 3 + 1];
+	float renV    = final_Ts[pix_id * 3 + 2];
+	
     float T = T_final;
     // the contribution from gaussians behind the current one
     float buffer[MAX_REGISTER_CHANNELS] = {0.f};
@@ -190,7 +193,7 @@ __global__ void nd_rasterize_backward_kernelME(
     }
     int bin_final = final_index[pix_id];
 
-    // iterate backward to compute the jacobians wrt rgbdh, opacity, mean2d, and
+    // iterate backward to compute the jacobians wrt colour, opacity, mean2d, and
     // conic recursively compute T_{n-1} from T_n, where T_i = prod(j < i) (1 -
     // alpha_j), and S_{n-1} from S_n, where S_j = sum_{i > j}(rgb_i * alpha_i *
     // T_i) df/dalpha_i = rgb_i * T_i - S_{i+1| / (1 - alpha_i)
@@ -221,15 +224,7 @@ __global__ void nd_rasterize_backward_kernelME(
         // compute the current T for this gaussian
         const float ra = 1.f / (1.f - alpha);
         T *= ra;
-        // rgbdh = rgbdhs[g];
-        // update v_rgbdh for this gaussian
-        // ME notes:
-        //    gaussian position/scale should be affected by r,g,b loss, and maybe d loss
-        //    gaussian opacity should be affected by r,g,b, and d losses
-        //    gaussian r,g,b,d,h affected by r,g,b,d,h losses.
-        // I _think_ the easy thing is to skip alpha for the h channel? If we don't want 
-        // d to influence scales/positions then we need seperate v_alpha for opacity vs. sigma
-        // later note: Maybe I don't want to do that... maybe letting h affect everything is _good_?
+
         const float fac = alpha * T;
         float v_alpha = 0.f;
         
@@ -240,33 +235,31 @@ __global__ void nd_rasterize_backward_kernelME(
         while( c < channels-1 )
         {
             // gradient wrt rgbd,  e,s
-            atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
+            atomicAdd(&(v_color[channels * g + c]), fac * v_out[c]);
             
             if( c < 4 )
             {
                 // contribution from this pixel
-                v_alpha += (rgbdhs[channels * g + c] * T - S[c] * ra) * v_out[c];
+                v_alpha += (colors[channels * g + c] * T - S[c] * ra) * v_out[c];
                 // contribution from background pixel
                 v_alpha += -T_final * ra * background[c] * v_out[c];
             }
             
             // update the running sum
-            S[c] += rgbdhs[channels * g + c] * fac;   
+            S[c] += colors[channels * g + c] * fac;
             ++c;
         }
         
-        // from forward:
-        //const float herr  = fac - ( vis * colors[channels * g + c] );
-        //const float hval  = 1e-2f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
-        //
-        // then derivative should be: (yay gemini!)
-        // dxd​f(x)= −2 * 1e-2 * vis * min(0,herr) − 2*vis*max(0,herr)
-        const float herr  = fac - ( vis * rgbdhs[channels * g + c] );
-        const float gval = -2.0 * 5e-1 * vis * min(0.0f, herr) - 2*vis*max(0.0f,herr);
-        
-        atomicAdd(&(v_rgbdh[channels * g + c]), gval * v_out[c]);
-        
-        v_alpha += T_final * ra * v_out_alpha;
+        // do variance channel works a bit differently
+		float d  = colors[ channels * g + 3 ];
+		float Gg = ( d - renD )*(d - renD)  - renV;
+		v_alpha += (Gg * T - S[ channels-1 ] * ra) * v_out[ channels-1 ];
+// 		v_alpha += -T_final * ra * G;
+		S[channels-1] += colors[channels * g + c] * fac;
+		
+		
+		v_alpha += T_final * ra * v_out_alpha;
+
 
         // update v_opacity for this gaussian
         atomicAdd(&(v_opacity[g]), vis * v_alpha);

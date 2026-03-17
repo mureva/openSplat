@@ -701,7 +701,7 @@ nd_rasterize_forward_tensorME(
         {img_height, img_width, channels}, xys.options().dtype(torch::kFloat32)
     );
     torch::Tensor final_Ts = torch::zeros(
-        {img_height, img_width}, xys.options().dtype(torch::kFloat32)
+        {img_height, img_width, 3}, xys.options().dtype(torch::kFloat32)
     );
     torch::Tensor final_idx = torch::zeros(
         {img_height, img_width}, xys.options().dtype(torch::kInt32)
