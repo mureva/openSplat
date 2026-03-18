@@ -353,14 +353,21 @@ __global__ void nd_rasterize_forwardME(
         // Now what we render is just a sum of the differences between the real render weight
         // and the `h` value at this gaussian.
         //
-        const float herr  = fac - ( vis * colors[channels * g + c] );
-        
-        // compute hloss. We're more interested in when this region of space _does_ have 
-        // have high render weight, rather than when it doesn't. 
-        // herr will be > 0 when h needs to increase, make that much stronger than 
-        // the need to decrease.
-        const float hval  = 5e-1f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
+//         const float herr  = fac - ( vis * colors[channels * g + c] );
+//         
+//         // compute hloss. We're more interested in when this region of space _does_ have 
+//         // have high render weight, rather than when it doesn't. 
+//         // herr will be > 0 when h needs to increase, make that much stronger than 
+//         // the need to decrease.
+//         const float hval  = 5e-1f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
+//         out_img[channels * pix_id + c ] += hval;
+
+        // what if we instead use our old ray-weight field loss?
+        const float hval =      fac  * -log(0.001 + vis * colors[ channels * g + c ] )
+                           + (1-fac) * -log(1.001 - vis * colors[ channels * g + c ] );
         out_img[channels * pix_id + c ] += hval;
+
+
         
         T = next_T;
     }

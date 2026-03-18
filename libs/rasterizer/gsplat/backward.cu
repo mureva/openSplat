@@ -262,12 +262,22 @@ __global__ void nd_rasterize_backward_kernelME(
         //
         // then derivative should be: (yay gemini!)
         // dxd​f(x)= −2 * 1e-2 * vis * min(0,herr) − 2*vis*max(0,herr)
-        const float herr  = fac - ( vis * rgbdhs[channels * g + c] );
-        const float gval = -2.0 * 5e-1 * vis * min(0.0f, herr) - 2*vis*max(0.0f,herr);
+//         const float herr  = fac - ( vis * rgbdhs[channels * g + c] );
+//         const float gval = -2.0 * 5e-1 * vis * min(0.0f, herr) - 2*vis*max(0.0f,herr);
+        const float gv0  = (vis*(1.0f-fac))/(1.001f - vis * rgbdhs[channels * g + c]);
+        const float gv1  = -(vis*fac)/(0.001f + vis * rgbdhs[channels * g + c]);
+        const float gval = gv0 + gv1;      // could downweight gv0 to make downward pull less than upward pull, but not obviously valuable
+        
+        // The loss could also propagate through to opacity, but 
+		// I'm a) not sure I've got it right and b) I'm not sure it would be a good idea anyway
+        //const float av0 = log( 0.001f + vis * rgbdhs[channels * g + c] );
+        //const float av1 = log( 1.001f - vis * rgbdhs[channels * g + c] );
+        //v_alpha += ( (av1 - av0) * T - S[c] * ra ) * v_out[c];
+        //S[c] += (av1 - av0) * fac;
         
         atomicAdd(&(v_rgbdh[channels * g + c]), gval * v_out[c]);
         
-        v_alpha += T_final * ra * v_out_alpha;
+//         v_alpha += T_final * ra * v_out_alpha;
 
         // update v_opacity for this gaussian
         atomicAdd(&(v_opacity[g]), vis * v_alpha);
