@@ -326,7 +326,7 @@ __global__ void nd_rasterize_forwardME(
         // fac is thus the current render weight - transmittance * weighted opacity
         const float fac = alpha * T;
         
-        // colour channels are r,g,b,d,  e,h,hl
+        // colour channels are r,g,b,d,  e,s,h
         //                     0,1,2,3,  4,5,6
         int c = 0;
         while( c < channels-1 )

@@ -239,10 +239,10 @@ __global__ void nd_rasterize_backward_kernelME(
         int c = 0;
         while( c < channels-1 )
         {
-            // gradient wrt rgbd,  e,s
+            // gradient wrt rgbd,  e,s,h
             atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
             
-            if( c < 4 )
+            if( c < 4 )  // r,g,b,d
             {
                 // contribution from this pixel
                 v_alpha += (rgbdhs[channels * g + c] * T - S[c] * ra) * v_out[c];
@@ -255,6 +255,7 @@ __global__ void nd_rasterize_backward_kernelME(
             ++c;
         }
         
+		// gradient for h
         // from forward:
         //const float herr  = fac - ( vis * colors[channels * g + c] );
         //const float hval  = 1e-2f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
