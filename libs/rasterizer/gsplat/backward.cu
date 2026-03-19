@@ -239,7 +239,7 @@ __global__ void nd_rasterize_backward_kernelME(
         int c = 0;
         while( c < channels-1 )
         {
-            // gradient wrt rgbd,  e,s,h
+            // gradient for rgbd,  e,s
             atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
             
             if( c < 4 )  // r,g,b,d
@@ -272,12 +272,12 @@ __global__ void nd_rasterize_backward_kernelME(
 		// I'm a) not sure I've got it right and b) I'm not sure it would be a good idea anyway
         //const float av0 = log( 0.001f + vis * rgbdhs[channels * g + c] );
         //const float av1 = log( 1.001f - vis * rgbdhs[channels * g + c] );
-        //v_alpha += ( (av1 - av0) * T - S[c] * ra ) * v_out[c];
+        //v_alpha += 1e-3 * ( ( (av1 - av0) * T - S[c] * ra ) * v_out[c] );
         //S[c] += (av1 - av0) * fac;
         
         atomicAdd(&(v_rgbdh[channels * g + c]), gval * v_out[c]);
         
-//         v_alpha += T_final * ra * v_out_alpha;
+        v_alpha += T_final * ra * v_out_alpha;
 
         // update v_opacity for this gaussian
         atomicAdd(&(v_opacity[g]), vis * v_alpha);
