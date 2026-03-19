@@ -237,7 +237,7 @@ __global__ void nd_rasterize_backward_kernelME(
         
         
         int c = 0;
-        while( c < channels-1 )
+        while( c < channels-2 )
         {
             // gradient for rgbd,  e,s
             atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
@@ -273,6 +273,7 @@ __global__ void nd_rasterize_backward_kernelME(
         
         // gradient for sparsity.
         ++c;
+		//const float sval = 1.0f - 2.0f * fac;
         const float sval = 2.0f * ( fac - (fac*fac) ) * (1.0 - 2.0*fac ); // I trust Gemini completely..
         v_alpha += (sval * T - S[c] * ra) * v_out[c];
         S[c] += sval;

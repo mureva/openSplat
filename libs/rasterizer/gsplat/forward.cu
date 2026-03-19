@@ -345,7 +345,7 @@ __global__ void nd_rasterize_forwardME(
         // then we have sparsity
         ++c;
         float sval = fac * (1-fac);
-        out_img[channels * pix_id + c ] += sval*sval;
+        out_img[channels * pix_id + c ] += sval; //sval*sval;
         
 
 
