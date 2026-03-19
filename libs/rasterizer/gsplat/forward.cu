@@ -326,46 +326,25 @@ __global__ void nd_rasterize_forwardME(
         // fac is thus the current render weight - transmittance * weighted opacity
         const float fac = alpha * T;
         
-        // colour channels are r,g,b,d,  e,s,h
-        //                     0,1,2,3,  4,5,6
+        // colour channels are r,g,b,d,  e,s,  h, p
+        //                     0,1,2,3,  4,5,  6, 7
         int c = 0;
-        while( c < channels-1 )
+        while( c < channels-2 )
         {
             out_img[channels * pix_id + c] += colors[channels * g + c] * fac;
             ++c;
         }
         
-        //
-        // what do we want 'h' to be? 
-        // we intuit that it mirrors the render weight of a gaussian.
-        // if it's a front surfae, high weight, a hidden surface, low weight.
-        // But that intuition only holds when we view a surface from one direction.
-        // As such, we rather think of `h` as the "maximum" render weight.
-        // or, we just make it much easier to _increase_ h than it is to decrease it.
-        //
-        // That part is easy enough, but then we have to consider that "fac" is affected
-        // by the shape of the gaussian - get further from the gaussian centre and "fac" goes
-        // down - so the apparent render weight also goes down.
-        //
-        // So when we learn a value for `h` we have to account for that.
-        // The easiest way is to apply "vis" to the `h` value before we use it.
-        //
-        // Now what we render is just a sum of the differences between the real render weight
-        // and the `h` value at this gaussian.
-        //
-//         const float herr  = fac - ( vis * colors[channels * g + c] );
-//         
-//         // compute hloss. We're more interested in when this region of space _does_ have 
-//         // have high render weight, rather than when it doesn't. 
-//         // herr will be > 0 when h needs to increase, make that much stronger than 
-//         // the need to decrease.
-//         const float hval  = 5e-1f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
-//         out_img[channels * pix_id + c ] += hval;
-
-        // what if we instead use our old ray-weight field loss?
+        
+        // h tries to learn the average render weight of a gaussian.
+        // we just use log-loss for this.
         const float hval =      fac  * -log(0.001 + vis * colors[ channels * g + c ] )
                            + (1-fac) * -log(1.001 - vis * colors[ channels * g + c ] );
         out_img[channels * pix_id + c ] += hval;
+
+        // then we have sparsity, which is a simple sum.
+        ++c;
+        out_img[channels * pix_id + c ] += fac * (1-fac);
 
 
         
@@ -376,9 +355,9 @@ __global__ void nd_rasterize_forwardME(
         (idx == range.y)
             ? idx - 1
             : idx; // index of in bin of last gaussian in this pixel
-    for (int c = 0; c < channels; ++c) {
-        if( c != 4 )
-            out_img[channels * pix_id + c] += T * background[c];
+    for (int c = 0; c < channels-2; ++c)
+    {
+        out_img[channels * pix_id + c] += T * background[c];
     }
 }
 

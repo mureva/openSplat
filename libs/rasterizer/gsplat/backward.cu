@@ -255,7 +255,7 @@ __global__ void nd_rasterize_backward_kernelME(
             ++c;
         }
         
-		// gradient for h
+        // gradient for h
         // from forward:
         //const float herr  = fac - ( vis * colors[channels * g + c] );
         //const float hval  = 1e-2f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
@@ -268,14 +268,16 @@ __global__ void nd_rasterize_backward_kernelME(
         const float gv1  = -(vis*fac)/(0.001f + vis * rgbdhs[channels * g + c]);
         const float gval = gv0 + gv1;      // could downweight gv0 to make downward pull less than upward pull, but not obviously valuable
         
-        // The loss could also propagate through to opacity, but 
-		// I'm a) not sure I've got it right and b) I'm not sure it would be a good idea anyway
-        //const float av0 = log( 0.001f + vis * rgbdhs[channels * g + c] );
-        //const float av1 = log( 1.001f - vis * rgbdhs[channels * g + c] );
-        //v_alpha += 1e-3 * ( ( (av1 - av0) * T - S[c] * ra ) * v_out[c] );
-        //S[c] += (av1 - av0) * fac;
-        
         atomicAdd(&(v_rgbdh[channels * g + c]), gval * v_out[c]);
+        
+        
+        // gradient for sparsity.
+        ++c;
+        const float sval = 1.0 - 2.0 * (vis*fac);
+        v_alpha += (sval * T - S[c] * ra) * v_out[c];
+        S[c] += sval;
+        
+        
         
         v_alpha += T_final * ra * v_out_alpha;
 
