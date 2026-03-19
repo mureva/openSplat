@@ -273,10 +273,11 @@ __global__ void nd_rasterize_backward_kernelME(
         
         // gradient for sparsity.
         ++c;
-        const float sval = 1.0 - 2.0 * (vis*fac);
+        const float sval = 2.0f * ( fac - (fac*fac) ) * (1.0 - 2.0*fac ); // I trust Gemini completely..
         v_alpha += (sval * T - S[c] * ra) * v_out[c];
         S[c] += sval;
         
+                
         
         
         v_alpha += T_final * ra * v_out_alpha;
