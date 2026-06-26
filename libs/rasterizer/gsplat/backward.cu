@@ -256,24 +256,16 @@ __global__ void nd_rasterize_backward_kernelME(
         }
         
         // gradient for h
-        // from forward:
-        //const float herr  = fac - ( vis * colors[channels * g + c] );
-        //const float hval  = 1e-2f*herr*min(0.0f,herr) + herr*max(0.0f,herr);
-        //
-        // then derivative should be: (yay gemini!)
-        // dxd​f(x)= −2 * 1e-2 * vis * min(0,herr) − 2*vis*max(0,herr)
-//         const float herr  = fac - ( vis * rgbdhs[channels * g + c] );
-//         const float gval = -2.0 * 5e-1 * vis * min(0.0f, herr) - 2*vis*max(0.0f,herr);
-        const float gv0  = (vis*(1.0f-fac))/(1.001f - vis * rgbdhs[channels * g + c]);
-        const float gv1  = -(vis*fac)/(0.001f + vis * rgbdhs[channels * g + c]);
-        const float gval = gv0 + gv1;      // could downweight gv0 to make downward pull less than upward pull, but not obviously valuable
+        // const float q     = fac;
+        const float q     = T;
+        const float ghval = -2.0 * vis * __expf(2*q-2) * (q - rgbdhs[ channels * g + c ] );
         
-        atomicAdd(&(v_rgbdh[channels * g + c]), gval * v_out[c]);
+        atomicAdd(&(v_rgbdh[channels * g + c]), ghval * v_out[c]);
         
         
         // gradient for sparsity.
         ++c;
-		//const float sval = 1.0f - 2.0f * fac;
+        //const float sval = 1.0f - 2.0f * fac;
         const float sval = 2.0f * ( fac - (fac*fac) ) * (1.0 - 2.0*fac ); // I trust Gemini completely..
         v_alpha += (sval * T - S[c] * ra) * v_out[c];
         S[c] += sval;

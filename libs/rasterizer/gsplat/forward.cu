@@ -311,17 +311,6 @@ __global__ void nd_rasterize_forwardME(
         const float vis = __expf(-sigma);
         const float alpha = min(0.999f, opac * vis);
 
-        // break out conditions
-        if (alpha < 1.f / 255.f) {
-            continue;
-        }
-        const float next_T = T * (1.f - alpha);
-        if (next_T <= 1e-4f) {
-            // we want to render the last gaussian that contributes and note
-            // that here idx > range.x so we don't underflow
-            idx -= 1;
-            break;
-        }
         
         // fac is thus the current render weight - transmittance * weighted opacity
         const float fac = alpha * T;
@@ -336,11 +325,17 @@ __global__ void nd_rasterize_forwardME(
         }
         
         
-        // h tries to learn the average render weight of a gaussian.
-        // we just use log-loss for this.
-        const float hval =      fac  * -log(0.001 + vis * colors[ channels * g + c ] )
-                           + (1-fac) * -log(1.001 - vis * colors[ channels * g + c ] );
-        out_img[channels * pix_id + c ] += hval;
+        // `h` is a term introduced to track the contribution of gaussians to the 
+        // render. We essentially are learning either a render-weight field,
+        // or a transmittance field. Experiments are needed to confirm which is best.
+        // Note that "vis" alone weights this term, not fac, because here we want to
+        // just accumulate all the error, not opacity-weighted error.
+        
+        // const float q = fac; // for renderweight field.
+        const float q = T  ; // for transmittance field.
+        const float hdiff = q - colors[ channels * g + c ];
+        const float hval  = vis * __expf( 2*q-2 ) * hdiff*hdiff;
+        
 
         // then we have sparsity
         ++c;
@@ -348,6 +343,17 @@ __global__ void nd_rasterize_forwardME(
         out_img[channels * pix_id + c ] += sval; //sval*sval;
         
 
+        // break out conditions
+        if (alpha < 1.f / 255.f) {
+            continue;
+        }
+        const float next_T = T * (1.f - alpha);
+        if (next_T <= 1e-4f) {
+            // we want to render the last gaussian that contributes and note
+            // that here idx > range.x so we don't underflow
+            idx -= 1;
+            break;
+        }
 
         
         T = next_T;
