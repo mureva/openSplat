@@ -320,7 +320,10 @@ __global__ void nd_rasterize_forwardME(
         int c = 0;
         while( c < channels-2 )
         {
-            out_img[channels * pix_id + c] += colors[channels * g + c] * fac;
+            if( c != 4 ) // !e
+                out_img[channels * pix_id + c] += colors[channels * g + c] * fac;
+            else         //  e
+                out_img[channels * pix_id + c] += colors[channels * g + c] * vis;  //don't take opacity into account, everything in this direction gets the error.
             ++c;
         }
         
@@ -331,8 +334,8 @@ __global__ void nd_rasterize_forwardME(
         // Note that "vis" alone weights this term, not fac, because here we want to
         // just accumulate all the error, not opacity-weighted error.
         
-        // const float q = fac; // for renderweight field.
-        const float q = T  ; // for transmittance field.
+        const float q = opac*T; // for renderweight field.
+        // const float q = T  ; // for transmittance field.
         const float hdiff = q - colors[ channels * g + c ];
         const float hval  = vis * __expf( 2*q-2 ) * hdiff*hdiff;
         out_img[channels * pix_id + c ] += hval;

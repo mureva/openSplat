@@ -240,8 +240,10 @@ __global__ void nd_rasterize_backward_kernelME(
         while( c < channels-2 )
         {
             // gradient for rgbd,  e,s
-            atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
-            
+			if( c != 4 ) // !e
+                atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
+            else
+                atomicAdd(&(v_rgbdh[channels * g + c]), vis * v_out[c]);
             if( c < 4 )  // r,g,b,d
             {
                 // contribution from this pixel
@@ -256,8 +258,8 @@ __global__ void nd_rasterize_backward_kernelME(
         }
         
         // gradient for h
-        // const float q     = fac;
-        const float q     = T;
+        const float q     = opac*T;
+        // const float q     = T;
         const float ghval = -2.0 * vis * __expf(2*q-2) * (q - rgbdhs[ channels * g + c ] );
         
         atomicAdd(&(v_rgbdh[channels * g + c]), ghval * v_out[c]);
