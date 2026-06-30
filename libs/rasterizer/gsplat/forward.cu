@@ -320,10 +320,10 @@ __global__ void nd_rasterize_forwardME(
         int c = 0;
         while( c < channels-2 )
         {
-            if( c != 4 ) // !e
+            //if( c != 4 ) // !e
                 out_img[channels * pix_id + c] += colors[channels * g + c] * fac;
-            else         //  e
-                out_img[channels * pix_id + c] += colors[channels * g + c] * vis;  //don't take opacity into account, everything in this direction gets the error.
+            //else         //  e
+            //    out_img[channels * pix_id + c] += colors[channels * g + c] * vis;  //don't take opacity into account, everything in this direction gets the error.
             ++c;
         }
         

@@ -240,10 +240,10 @@ __global__ void nd_rasterize_backward_kernelME(
         while( c < channels-2 )
         {
             // gradient for rgbd,  e,s
-			if( c != 4 ) // !e
+			//if( c != 4 ) // !e
                 atomicAdd(&(v_rgbdh[channels * g + c]), fac * v_out[c]);
-            else
-                atomicAdd(&(v_rgbdh[channels * g + c]), vis * v_out[c]);
+            //else
+            //    atomicAdd(&(v_rgbdh[channels * g + c]), vis * v_out[c]);
             if( c < 4 )  // r,g,b,d
             {
                 // contribution from this pixel
