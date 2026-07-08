@@ -335,9 +335,10 @@ __global__ void nd_rasterize_forwardME(
         // just accumulate all the error, not opacity-weighted error.
         
         const float q = opac*T; // for renderweight field.
-        // const float q = T  ; // for transmittance field.
+//         const float q = T  ; // for transmittance field.
         const float hdiff = q - colors[ channels * g + c ];
-        const float hval  = vis * __expf( 2*q-2 ) * hdiff*hdiff;
+        //const float hval  = vis * __expf( 2*q-2 ) * hdiff*hdiff;
+		const float hval  = vis * hdiff*hdiff;
         out_img[channels * pix_id + c ] += hval;
 
         // then we have sparsity

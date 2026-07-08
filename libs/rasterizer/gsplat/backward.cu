@@ -259,9 +259,9 @@ __global__ void nd_rasterize_backward_kernelME(
         
         // gradient for h
         const float q     = opac*T;
-        // const float q     = T;
-        const float ghval = -2.0 * vis * __expf(2*q-2) * (q - rgbdhs[ channels * g + c ] );
-        
+//         const float q     = T;
+//         const float ghval = -2.0 * vis * __expf(2*q-2) * (q - rgbdhs[ channels * g + c ] );
+        const float ghval = -2.0 * vis * (q - rgbdhs[ channels * g + c ] );
         atomicAdd(&(v_rgbdh[channels * g + c]), ghval * v_out[c]);
         
         
