@@ -334,8 +334,8 @@ __global__ void nd_rasterize_forwardME(
         // Note that "vis" alone weights this term, not fac, because here we want to
         // just accumulate all the error, not opacity-weighted error.
         
-        const float q = opac*T; // for renderweight field.
-//         const float q = T  ; // for transmittance field.
+//        const float q = opac*T; // for renderweight field.
+        const float q = T  ; // for transmittance field.
         const float hdiff = q - colors[ channels * g + c ];
         //const float hval  = vis * __expf( 2*q-2 ) * hdiff*hdiff;
 		const float hval  = vis * hdiff*hdiff;
